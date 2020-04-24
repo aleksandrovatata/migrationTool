@@ -6,7 +6,7 @@ public class QueryForDiplomas {
             " alias AS category_slug" +
             " FROM jos_zoo_category";
 
-    private final static String queryCreateTable = "SELECT" +
+    private final static String querySelectAllDiplomas = "SELECT" +
             " i.id AS diploma_id," +
             " trim(si_t.value) AS diploma_topic," +
             " trim(si_s.value) AS diploma_supervisor," +
@@ -22,8 +22,16 @@ public class QueryForDiplomas {
 
     private final static String queryInsertCategories = "INSERT INTO wp_terms(name, slug, term_group) VALUES (?, ? ,0)";
 
-    public static String getQueryCreateTable() {
-        return queryCreateTable;
+    private final static String queryInsertDiplomas =
+            "INSERT INTO wp_posts(post_author, post_date, post_date_gmt, post_content, post_title, post_excerpt, post_status, comment_status, ping_status, post_password, post_name, to_ping, pinged, post_modified, post_modified_gmt, post_content_filtered, post_parent, guid, menu_order, post_type, post_mime_type) " +
+            "VALUES (1, ?, ?, ?, ?, '', 'publish', 'closed', 'closed', '','','','',?,?,'',0,'',0,'post', '')";
+
+    private final static String querySelectRelationshipDiplomas = "SELECT * FROM jos_zoo_category_item";
+
+    private final static String queryInsertRelationshipDiplomas = "INSERT INTO wp_term_relationships(object_id, term_taxonomy_id) VALUES(?,?)";
+
+    public static String getQuerySelectAllDiplomas() {
+        return querySelectAllDiplomas;
     }
 
     public static String getQuerySelectAllCategories() {
@@ -40,5 +48,17 @@ public class QueryForDiplomas {
 
     public static String getQueryInsertCategoryRelationship() {
         return queryInsertCategoryRelationship;
+    }
+
+    public static String getQueryInsertDiplomas() {
+        return queryInsertDiplomas;
+    }
+
+    public static String getQuerySelectRelationshipDiplomas() {
+        return querySelectRelationshipDiplomas;
+    }
+
+    public static String getQueryInsertRelationshipDiplomas() {
+        return queryInsertRelationshipDiplomas;
     }
 }
