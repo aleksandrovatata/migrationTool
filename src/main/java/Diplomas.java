@@ -65,7 +65,7 @@ public class Diplomas {
             insertParentCategoryStatement.setInt(2, wordpressParentId);
 
             insertParentCategoryStatement.executeUpdate();
-            
+
         }
 
         // var joomlaCategoryId = 67;
