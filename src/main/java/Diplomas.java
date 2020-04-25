@@ -1,7 +1,8 @@
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.text.*;
 import java.time.LocalDate;
 import java.util.*;
 import java.sql.Date;
@@ -14,6 +15,9 @@ public class Diplomas {
     Map<Integer, Integer> categoryIdsMapping = new HashMap();
 
     Map<Integer, Integer> diplomaIdsMapping = new HashMap();
+
+    // key - Joomla category_id, value - Wordpress term_taxonomy_id
+    Map<Integer, Integer> termTaxonomyIdsMapping = new HashMap();
 
     Connection sourceDbConnection;
     Connection destinationDbConnection;
@@ -32,8 +36,10 @@ public class Diplomas {
         SelectAllCategoriesFromJoomlaAndInsertThemInWP();
         SelectAllRelationshipFromJoomlaAndInsertThemInWP();
         SelectAllDiplomasFromJoomlaAndInsertThemInWP();
-    }
+        SelectAllRelationshipDiplomasFromJoomlaAndInsertThemInWP();
 
+        Cleanup();
+    }
     void SelectAllCategoriesFromJoomlaAndInsertThemInWP() throws SQLException {
 
         var selectCategoriesQueryText = queryForDiplomas.getQuerySelectAllCategories();
@@ -49,11 +55,14 @@ public class Diplomas {
             var categoryId = selectCategoriesResultSet.getInt("category_id");
             var categoryName = selectCategoriesResultSet.getString("category_name");
             var categorySlug = selectCategoriesResultSet.getString("category_slug");
+
+            var categorySlugTrimmed = categorySlug.substring(0, Math.min(categorySlug.length(), 40));
+            var categorySlugUrlEncoded = URLEncoder.encode(categorySlugTrimmed, StandardCharsets.UTF_8);
+
             insertCategoryStatement.setNString(1, categoryName);
-            insertCategoryStatement.setNString(2, categorySlug);
+            insertCategoryStatement.setNString(2, categorySlugUrlEncoded);
 
             insertCategoryStatement.executeUpdate();
-
 
             var generatedKeys = insertCategoryStatement.getGeneratedKeys();
             if (generatedKeys.next()) {
@@ -72,23 +81,27 @@ public class Diplomas {
         var selectParentCategoriesResultSet = selectParentCategoriesStatement.executeQuery();
 
         var insertParentCategoryQueryText = queryForDiplomas.getQueryInsertCategoryRelationship();
-        var insertParentCategoryStatement = destinationDbConnection.prepareStatement(insertParentCategoryQueryText);
+        var insertParentCategoryStatement = destinationDbConnection.prepareStatement(insertParentCategoryQueryText, Statement.RETURN_GENERATED_KEYS);
 
         while (selectParentCategoriesResultSet.next()) {
-            var id = selectParentCategoriesResultSet.getInt("id");
-            var wordpressId = categoryIdsMapping.get(id);
+            var joomlaCategoryId = selectParentCategoriesResultSet.getInt("id");
+            var wordpressTermId = categoryIdsMapping.get(joomlaCategoryId);
 
-            var parentId = selectParentCategoriesResultSet.getInt("parent");
-            var wordpressParentId = parentId == 0 ? 0 : categoryIdsMapping.get(parentId);
+            var joomlaParentCategoryId = selectParentCategoriesResultSet.getInt("parent");
+            var wordpressParentTermId = joomlaParentCategoryId == 0 ? 0 : categoryIdsMapping.get(joomlaParentCategoryId);
 
-            insertParentCategoryStatement.setInt(1, wordpressId);
-            insertParentCategoryStatement.setInt(2, wordpressParentId);
+            insertParentCategoryStatement.setInt(1, wordpressTermId);
+            insertParentCategoryStatement.setInt(2, wordpressParentTermId);
 
             insertParentCategoryStatement.executeUpdate();
 
+            var generatedKeys = insertParentCategoryStatement.getGeneratedKeys();
+            if (generatedKeys.next()) {
+                var termTaxonomyId = generatedKeys.getInt(1);
+                termTaxonomyIdsMapping.put(joomlaCategoryId, termTaxonomyId);
+            }
         }
     }
-
 
     void SelectAllDiplomasFromJoomlaAndInsertThemInWP() throws SQLException {
 
@@ -99,8 +112,7 @@ public class Diplomas {
         var insertDiplomasQueryText = queryForDiplomas.getQueryInsertDiplomas();
         var insertDiplomasStatement = destinationDbConnection.prepareStatement(insertDiplomasQueryText, Statement.RETURN_GENERATED_KEYS);
 
-        while(selectDiplomasResultSet.next())
-        {
+        while (selectDiplomasResultSet.next()) {
             var diplomaId = selectDiplomasResultSet.getInt("diploma_id");
             var diplomaTopic = selectDiplomasResultSet.getString("diploma_topic");
             var diplomaSupervisor = selectDiplomasResultSet.getString("diploma_supervisor");
@@ -118,14 +130,42 @@ public class Diplomas {
 
             var generatedKeys = insertDiplomasStatement.getGeneratedKeys();
             if (generatedKeys.next()) {
-                var wordpressDiplomId = generatedKeys.getInt(1);
-                diplomaIdsMapping.put(diplomaId, wordpressDiplomId);
+                var wordpressDiplomaId = generatedKeys.getInt(1);
+                diplomaIdsMapping.put(diplomaId, wordpressDiplomaId);
             }
         }
     }
 
-    void SelectAllRelationshipDiplomasFromJoomlaAndInsertThemInWP() {
+    void SelectAllRelationshipDiplomasFromJoomlaAndInsertThemInWP() throws SQLException {
 
+        String selectDiplomasRelationshipQueryText = queryForDiplomas.getQuerySelectRelationshipDiplomas();
+        var selectDiplomasRelationshipStatement = sourceDbConnection.prepareStatement(selectDiplomasRelationshipQueryText);
+        var selectDiplomasRelationshipResultSet = selectDiplomasRelationshipStatement.executeQuery();
+
+        var insertDiplomasRelationshipQueryText = queryForDiplomas.getQueryInsertRelationshipDiplomas();
+        var insertDiplomasRelationshipStatement = destinationDbConnection.prepareStatement(insertDiplomasRelationshipQueryText, Statement.RETURN_GENERATED_KEYS);
+
+        while (selectDiplomasRelationshipResultSet.next()) {
+            var joomlaItemId = selectDiplomasRelationshipResultSet.getInt("item_id");
+            var wordpressPostId = diplomaIdsMapping.get(joomlaItemId);
+
+            var joomlaCategoryId = selectDiplomasRelationshipResultSet.getInt("category_id");
+            var wordpressTermTaxonomyId = termTaxonomyIdsMapping.get(joomlaCategoryId);
+
+            insertDiplomasRelationshipStatement.setInt(1, wordpressPostId);
+            insertDiplomasRelationshipStatement.setInt(2, wordpressTermTaxonomyId);
+
+            insertDiplomasRelationshipStatement.executeUpdate();
+        }
     }
 
+    private void Cleanup() throws SQLException {
+        var clearCacheQueryText = queryForDiplomas.getQueryClearCache();
+        var clearCacheStatement = destinationDbConnection.prepareStatement(clearCacheQueryText);
+        clearCacheStatement.executeUpdate();
+
+        var recalculateCategoryPostsCountQueryText = queryForDiplomas.getQueryRecalculateCategoryPostsCount();
+        var recalculateCategoryPostsCountStatement = destinationDbConnection.prepareStatement(recalculateCategoryPostsCountQueryText);
+        recalculateCategoryPostsCountStatement.executeUpdate();
+    }
 }
