@@ -1,38 +1,32 @@
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
+import org.apache.commons.lang3.StringUtils;
+import org.w3c.dom.*;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.*;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
+import java.io.*;
+
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.LocalDate;
 import java.util.*;
-import java.sql.Date;
 
-public class Diplomas {
-
-    static QueryForDiplomas queryForDiplomas = new QueryForDiplomas();
+public class Diplomas extends MigrationBase {
 
     // key - Joomla category_id, value - Wordpress term_id
-    Map<Integer, Integer> categoryIdsMapping = new HashMap();
+    Map<Integer, Integer> categoryIdsMapping = new HashMap<>();
 
-    Map<Integer, Integer> diplomaIdsMapping = new HashMap();
+    Map<Integer, Integer> diplomaIdsMapping = new HashMap<>();
 
     // key - Joomla category_id, value - Wordpress term_taxonomy_id
-    Map<Integer, Integer> termTaxonomyIdsMapping = new HashMap();
+    Map<Integer, Integer> termTaxonomyIdsMapping = new HashMap<>();
 
-    Connection sourceDbConnection;
-    Connection destinationDbConnection;
-
-    public Diplomas() {
-        try {
-            sourceDbConnection = new Joomla().getConnection();
-            destinationDbConnection = new WordPress().getConnection();
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void Migrate() throws SQLException {
+    public void Migrate() throws Exception {
         SelectAllCategoriesFromJoomlaAndInsertThemInWP();
         SelectAllRelationshipFromJoomlaAndInsertThemInWP();
         SelectAllDiplomasFromJoomlaAndInsertThemInWP();
@@ -40,15 +34,16 @@ public class Diplomas {
 
         Cleanup();
     }
+
     void SelectAllCategoriesFromJoomlaAndInsertThemInWP() throws SQLException {
 
-        var selectCategoriesQueryText = queryForDiplomas.getQuerySelectAllCategories();
+        var selectCategoriesQueryText = QueryForDiplomas.getQuerySelectAllCategories();
 
         var selectCategoriesStatement = sourceDbConnection.prepareStatement(selectCategoriesQueryText);
         var selectCategoriesResultSet = selectCategoriesStatement.executeQuery();
 
         //insert all joomla zoo categories in wordpress categories
-        var insertCategoryQueryText = queryForDiplomas.getQueryInsertCategories();
+        var insertCategoryQueryText = QueryForDiplomas.getQueryInsertCategories();
         var insertCategoryStatement = destinationDbConnection.prepareStatement(insertCategoryQueryText, Statement.RETURN_GENERATED_KEYS);
 
         while (selectCategoriesResultSet.next()) {
@@ -56,11 +51,8 @@ public class Diplomas {
             var categoryName = selectCategoriesResultSet.getString("category_name");
             var categorySlug = selectCategoriesResultSet.getString("category_slug");
 
-            var categorySlugTrimmed = categorySlug.substring(0, Math.min(categorySlug.length(), 40));
-            var categorySlugUrlEncoded = URLEncoder.encode(categorySlugTrimmed, StandardCharsets.UTF_8);
-
             insertCategoryStatement.setNString(1, categoryName);
-            insertCategoryStatement.setNString(2, categorySlugUrlEncoded);
+            insertCategoryStatement.setNString(2, NormalizeSlug(categorySlug));
 
             insertCategoryStatement.executeUpdate();
 
@@ -68,19 +60,18 @@ public class Diplomas {
             if (generatedKeys.next()) {
                 var wordpressTermId = generatedKeys.getInt(1);
                 categoryIdsMapping.put(categoryId, wordpressTermId);
-                //System.out.println(String.format("Joomla category_id: %s, Wordpress term_id: %s", categoryId, wordpressTermId));
             }
         }
     }
 
     void SelectAllRelationshipFromJoomlaAndInsertThemInWP() throws SQLException {
         //select all relashionships from zoo joomla and insert them in wp_term_taxonomy
-        var selectParentCategoriesQueryText = queryForDiplomas.getQuerySelectCategoryRelationship();
+        var selectParentCategoriesQueryText = QueryForDiplomas.getQuerySelectCategoryRelationship();
 
         var selectParentCategoriesStatement = sourceDbConnection.prepareStatement(selectParentCategoriesQueryText);
         var selectParentCategoriesResultSet = selectParentCategoriesStatement.executeQuery();
 
-        var insertParentCategoryQueryText = queryForDiplomas.getQueryInsertCategoryRelationship();
+        var insertParentCategoryQueryText = QueryForDiplomas.getQueryInsertCategoryRelationship();
         var insertParentCategoryStatement = destinationDbConnection.prepareStatement(insertParentCategoryQueryText, Statement.RETURN_GENERATED_KEYS);
 
         while (selectParentCategoriesResultSet.next()) {
@@ -103,46 +94,61 @@ public class Diplomas {
         }
     }
 
-    void SelectAllDiplomasFromJoomlaAndInsertThemInWP() throws SQLException {
+    void SelectAllDiplomasFromJoomlaAndInsertThemInWP() throws Exception {
 
-        String selectDiplomasQueryText = queryForDiplomas.getQuerySelectAllDiplomas();
+        String selectDiplomasQueryText = QueryForDiplomas.getQuerySelectAllDiplomas();
         var selectDiplomasStatement = sourceDbConnection.prepareStatement(selectDiplomasQueryText);
         var selectDiplomasResultSet = selectDiplomasStatement.executeQuery();
 
-        var insertDiplomasQueryText = queryForDiplomas.getQueryInsertDiplomas();
-        var insertDiplomasStatement = destinationDbConnection.prepareStatement(insertDiplomasQueryText, Statement.RETURN_GENERATED_KEYS);
+        var updatePostContentQueryText = QueryForDiplomas.getQueryUpdatePostContent();
+        var updatePostContentStatement = destinationDbConnection.prepareStatement(updatePostContentQueryText);
 
         while (selectDiplomasResultSet.next()) {
             var diplomaId = selectDiplomasResultSet.getInt("diploma_id");
+            var diplomaElements = selectDiplomasResultSet.getString("diploma_elements");
             var diplomaTopic = selectDiplomasResultSet.getString("diploma_topic");
             var diplomaSupervisor = selectDiplomasResultSet.getString("diploma_supervisor");
             var studentName = selectDiplomasResultSet.getString("student_name");
+            var slug = selectDiplomasResultSet.getString("alias");
 
-            Date date = Date.valueOf(LocalDate.now());
-            insertDiplomasStatement.setDate(1, date);
-            insertDiplomasStatement.setDate(2, date);
-            insertDiplomasStatement.setNString(3, String.format("<!-- wp:paragraph --><p><b>%s</b></p> <p>Тема дипломної роботи: <i>%s</i></p> <p>Науковий керівник: %s</p><!-- /wp:paragraph -->", studentName, diplomaTopic, diplomaSupervisor));
-            insertDiplomasStatement.setNString(4, String.format("%s - %s", studentName, diplomaTopic));
-            insertDiplomasStatement.setDate(5, date);
-            insertDiplomasStatement.setDate(6, date);
+            String diplomaPostTitle = String.format("%s - %s", studentName, diplomaTopic);
 
-            insertDiplomasStatement.executeUpdate();
+            int wordpressDiplomaId = InsertPost(diplomaPostTitle, NormalizeSlug(slug));
+            diplomaIdsMapping.put(diplomaId, wordpressDiplomaId);
 
-            var generatedKeys = insertDiplomasStatement.getGeneratedKeys();
-            if (generatedKeys.next()) {
-                var wordpressDiplomaId = generatedKeys.getInt(1);
-                diplomaIdsMapping.put(diplomaId, wordpressDiplomaId);
-            }
+            StringBuilder diplomaPostContentBuilder = new StringBuilder();
+            diplomaPostContentBuilder.append("<!-- wp:paragraph -->");
+            diplomaPostContentBuilder.append(String.format("<p><b>%s</b></p>", studentName));
+            diplomaPostContentBuilder.append(String.format("<p>Тема дипломної роботи: <i>%s</i></p>", diplomaTopic));
+            diplomaPostContentBuilder.append(String.format("<p>Науковий керівник: %s</p>", diplomaSupervisor));
+            diplomaPostContentBuilder.append("<!-- /wp:paragraph -->");
+
+            var presentationFilePath = ParseDocumentName(diplomaElements, "312d6aeb-7e50-4d4a-99fd-9d0380cddf87");
+            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, presentationFilePath, "presentation");
+
+            var diplomaUkFilePath = ParseDocumentName(diplomaElements, "243f9373-527c-4bbb-9ba2-6eccd140ab4e");
+            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, diplomaUkFilePath, "diploma-uk");
+
+            var diplomaRuFilePath = ParseDocumentName(diplomaElements, "27b10641-7d14-40a8-ac12-53b38e8af657");
+            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, diplomaRuFilePath, "diploma-ru");
+
+            var diplomaEnFilePath = ParseDocumentName(diplomaElements, "62a079d4-5a28-4197-a54d-4f024429c2f0");
+            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, diplomaEnFilePath, "diploma-en");
+
+            updatePostContentStatement.setNString(1, diplomaPostContentBuilder.toString());
+            updatePostContentStatement.setInt(2, wordpressDiplomaId);
+
+            updatePostContentStatement.executeUpdate();
         }
     }
 
-    void SelectAllRelationshipDiplomasFromJoomlaAndInsertThemInWP() throws SQLException {
+    private void SelectAllRelationshipDiplomasFromJoomlaAndInsertThemInWP() throws SQLException {
 
-        String selectDiplomasRelationshipQueryText = queryForDiplomas.getQuerySelectRelationshipDiplomas();
+        String selectDiplomasRelationshipQueryText = QueryForDiplomas.getQuerySelectRelationshipDiplomas();
         var selectDiplomasRelationshipStatement = sourceDbConnection.prepareStatement(selectDiplomasRelationshipQueryText);
         var selectDiplomasRelationshipResultSet = selectDiplomasRelationshipStatement.executeQuery();
 
-        var insertDiplomasRelationshipQueryText = queryForDiplomas.getQueryInsertRelationshipDiplomas();
+        var insertDiplomasRelationshipQueryText = QueryForDiplomas.getQueryInsertRelationshipDiplomas();
         var insertDiplomasRelationshipStatement = destinationDbConnection.prepareStatement(insertDiplomasRelationshipQueryText, Statement.RETURN_GENERATED_KEYS);
 
         while (selectDiplomasRelationshipResultSet.next()) {
@@ -159,13 +165,39 @@ public class Diplomas {
         }
     }
 
-    private void Cleanup() throws SQLException {
-        var clearCacheQueryText = queryForDiplomas.getQueryClearCache();
-        var clearCacheStatement = destinationDbConnection.prepareStatement(clearCacheQueryText);
-        clearCacheStatement.executeUpdate();
+    private void AddAttachmentToPost(int postId, StringBuilder postContentBuilder, String filePath, String title) throws Exception {
+        if (StringUtils.isEmpty(filePath)) {
+            return;
+        }
 
-        var recalculateCategoryPostsCountQueryText = queryForDiplomas.getQueryRecalculateCategoryPostsCount();
-        var recalculateCategoryPostsCountStatement = destinationDbConnection.prepareStatement(recalculateCategoryPostsCountQueryText);
-        recalculateCategoryPostsCountStatement.executeUpdate();
+        Path path = Paths.get(filePath);
+        var fileName = path.getFileName().toString();
+        var fileUrl = Configuration.GenerateDocumentUrl(fileName);
+
+        int attachmentPostId = InsertAttachmentPost(title, fileUrl, postId);
+
+        postContentBuilder.append(String.format("<!-- wp:file {\"id\":%s,\"href\":\"%s\"} -->", attachmentPostId, fileUrl));
+        postContentBuilder.append("<div class=\"wp-block-file\">");
+        postContentBuilder.append(String.format("<a href=\"%s\">%s</a>", fileUrl, title));
+        postContentBuilder.append(String.format("<a href=\"%s\" class=\"wp-block-file__button\" download>Завантажити</a>", fileUrl));
+        postContentBuilder.append("</div>");
+        postContentBuilder.append("<!-- /wp:file -->");
+    }
+
+    private String ParseDocumentName(String xml, String documentIdentifier) throws ParserConfigurationException, IOException, SAXException, XPathExpressionException {
+        DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+        InputSource is = new InputSource(new StringReader(xml));
+        Document doc = dBuilder.parse(is);
+
+        var xPathExpression = String.format("/elements/download[@identifier='%s']/file", documentIdentifier);
+        XPath xPath = XPathFactory.newInstance().newXPath();
+        NodeList nodeList = (NodeList) xPath.compile(xPathExpression).evaluate(doc, XPathConstants.NODESET);
+        if (nodeList.getLength() == 0) {
+            return null;
+        }
+
+        Node node = nodeList.item(0);
+        return node.getTextContent();
     }
 }

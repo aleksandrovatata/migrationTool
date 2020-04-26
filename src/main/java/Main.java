@@ -1,10 +1,11 @@
-import java.sql.*;
-
 public class Main {
 
-    public static void main(String[] args) throws SQLException {
+    public static void main(String[] args) throws Exception {
         Diplomas diplomas = new Diplomas();
-            diplomas.Migrate();
+        diplomas.Migrate();
+
+        News news = new News();
+        news.Migrate();
 
         System.out.println("Migration completed.");
     }
