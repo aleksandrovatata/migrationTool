@@ -7,6 +7,9 @@ public class Main {
         News news = new News();
         news.Migrate();
 
+        Conferences conferences = new Conferences();
+        conferences.Migrate();
+
         System.out.println("Migration completed.");
     }
 }

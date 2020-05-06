@@ -3,8 +3,7 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 
-
-public class News extends MigrationBase {
+public class Conferences extends MigrationBase{
 
     // key - Joomla category_id, value - Wordpress term_taxonomy_id
     Map<Integer, Integer> termTaxonomyIdsMapping = new HashMap<>();
@@ -18,7 +17,7 @@ public class News extends MigrationBase {
     }
 
     private void SelectCategoryNewsFromJoomlaAndInsertItInWordpress() throws SQLException {
-        var selectCategoryNewsQueryText = QueryForNews.getQuerySelectCategoryNews();
+        var selectCategoryNewsQueryText = QueryForConf.getQuerySelectCategoryConferences();
 
         var selectCategoryNewsStatement = sourceDbConnection.prepareStatement(selectCategoryNewsQueryText);
         var selectCategoryNewsResultSet = selectCategoryNewsStatement.executeQuery();
@@ -39,7 +38,7 @@ public class News extends MigrationBase {
 
             insertCategoryNewsStatement.executeUpdate();
 
-            var insertTermTaxonomyNewsQueryText = QueryForNews.getQueryInsertCategoryRelationship();
+            var insertTermTaxonomyNewsQueryText = QueryForConf.getQueryInsertCategoryRelationship();
             var insertTermTaxonomyNewsStatement = destinationDbConnection.prepareStatement(insertTermTaxonomyNewsQueryText, Statement.RETURN_GENERATED_KEYS);
 
             var generatedKeys = insertCategoryNewsStatement.getGeneratedKeys();
@@ -51,8 +50,8 @@ public class News extends MigrationBase {
 
             var generatedKeysTaxonomy = insertTermTaxonomyNewsStatement.getGeneratedKeys();
             if (generatedKeysTaxonomy.next()) {
-                var wordpressTermId = generatedKeysTaxonomy.getInt(1);
-                termTaxonomyIdsMapping.put(joomlaCategoryId, wordpressTermId);
+                var wordpressTermTaxonomyId = generatedKeysTaxonomy.getInt(1);
+                termTaxonomyIdsMapping.put(joomlaCategoryId, wordpressTermTaxonomyId);
             }
         }
     }
@@ -61,16 +60,16 @@ public class News extends MigrationBase {
 
         var wordpressTermTaxonomyId = termTaxonomyIdsMapping.get(joomlaCategoryId);
 
-        var selectContentNewsQueryText = QueryForNews.getQuerySelectAllNews();
+        var selectContentNewsQueryText = QueryForConf.getQuerySelectAllConferences();
 
         var selectContentNewsStatement = sourceDbConnection.prepareStatement(selectContentNewsQueryText);
         selectContentNewsStatement.setInt(1, joomlaCategoryId);
         var selectContentNewsResultSet = selectContentNewsStatement.executeQuery();
 
-        var insertNewsRelationshipQueryText = QueryForNews.getQueryInsertRelationshipNews();
+        var insertNewsRelationshipQueryText = QueryForConf.getQueryInsertRelationshipConferences();
         var insertNewsRelationshipStatement = destinationDbConnection.prepareStatement(insertNewsRelationshipQueryText, Statement.RETURN_GENERATED_KEYS);
 
-        var updatePostContentQueryText = QueryForNews.getQueryUpdatePostContent();
+        var updatePostContentQueryText = QueryBase.getQueryUpdatePostContent();
         var updatePostContentStatement = destinationDbConnection.prepareStatement(updatePostContentQueryText);
 
         while (selectContentNewsResultSet.next()) {
@@ -91,7 +90,7 @@ public class News extends MigrationBase {
             newsPostContentBuilder.append(UpdateImageLinks(newsContent));
             newsPostContentBuilder.append("<!-- /wp:paragraph -->");
 
-            var selectAttachmentsNewsQueryText = QueryForNews.getQuerySelectAllAttachmentsForNews();
+            var selectAttachmentsNewsQueryText = QueryForConf.getQuerySelectAllAttachmentsForConferences();
 
             var selectAttachmentsNewsStatement = sourceDbConnection.prepareStatement(selectAttachmentsNewsQueryText);
             selectAttachmentsNewsStatement.setInt(1, newsId);
@@ -115,32 +114,4 @@ public class News extends MigrationBase {
         }
     }
 
-    /*private void AddAttachmentToPost(int postId, StringBuilder postContentBuilder, String filePath, String title) throws Exception {
-        if (StringUtils.isEmpty(filePath)) {
-            return;
-        }
-
-        Path path = Paths.get(filePath);
-        var fileName = path.getFileName().toString();
-        var fileUrl = Configuration.GenerateDocumentUrl(fileName);
-
-        int attachmentPostId = InsertAttachmentPost(title, fileUrl, postId);
-
-        postContentBuilder.append(String.format("<!-- wp:file {\"id\":%s,\"href\":\"%s\"} -->", attachmentPostId, fileUrl));
-        postContentBuilder.append("<div class=\"wp-block-file\">");
-        postContentBuilder.append(String.format("<a href=\"%s\">%s</a>", fileUrl, title));
-        postContentBuilder.append(String.format("<a href=\"%s\" class=\"wp-block-file__button\" download>Завантажити</a>", fileUrl));
-        postContentBuilder.append("</div>");
-        postContentBuilder.append("<!-- /wp:file -->");
-    }*/
-
-    /*private String UpdateImageLinks(String content) {
-        Pattern p = Pattern.compile("src\\s*=\\s*\"(.+?)\"");
-        Matcher m = p.matcher(content);
-        if (m.find()) {
-            return m.replaceAll("src=\"/wp-content/themes/start-theme/$1\"");
-        }
-
-        return content;
-    }*/
 }

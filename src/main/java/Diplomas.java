@@ -1,4 +1,3 @@
-import org.apache.commons.lang3.StringUtils;
 import org.w3c.dom.*;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
@@ -10,8 +9,6 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import java.io.*;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
@@ -163,25 +160,6 @@ public class Diplomas extends MigrationBase {
 
             insertDiplomasRelationshipStatement.executeUpdate();
         }
-    }
-
-    private void AddAttachmentToPost(int postId, StringBuilder postContentBuilder, String filePath, String title) throws Exception {
-        if (StringUtils.isEmpty(filePath)) {
-            return;
-        }
-
-        Path path = Paths.get(filePath);
-        var fileName = path.getFileName().toString();
-        var fileUrl = Configuration.GenerateDocumentUrl(fileName);
-
-        int attachmentPostId = InsertAttachmentPost(title, fileUrl, postId);
-
-        postContentBuilder.append(String.format("<!-- wp:file {\"id\":%s,\"href\":\"%s\"} -->", attachmentPostId, fileUrl));
-        postContentBuilder.append("<div class=\"wp-block-file\">");
-        postContentBuilder.append(String.format("<a href=\"%s\">%s</a>", fileUrl, title));
-        postContentBuilder.append(String.format("<a href=\"%s\" class=\"wp-block-file__button\" download>Завантажити</a>", fileUrl));
-        postContentBuilder.append("</div>");
-        postContentBuilder.append("<!-- /wp:file -->");
     }
 
     private String ParseDocumentName(String xml, String documentIdentifier) throws ParserConfigurationException, IOException, SAXException, XPathExpressionException {

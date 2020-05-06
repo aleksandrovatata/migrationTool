@@ -13,6 +13,13 @@
             <artifactId>documentation-jdbc</artifactId>
             <version>5.4.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.ibm.icu</groupId>
+            <artifactId>icu4j</artifactId>
+            <version>67.1</version>
+        </dependency>
+
+
     </dependencies>
 
     <properties>
