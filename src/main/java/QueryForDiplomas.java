@@ -20,9 +20,7 @@ public class QueryForDiplomas extends QueryBase {
 
     private final static String querySelectCategoryRelationship = "SELECT id, parent FROM jos_zoo_category";
 
-    private final static String queryInsertCategoryRelationship = "INSERT INTO wp_term_taxonomy(term_id, taxonomy, description, parent, count) VALUES (?, 'category', '', ?, 0)";
-
-    private final static String queryInsertCategories = "INSERT INTO wp_terms(name, slug, term_group) VALUES (?, ? ,0)";
+    private final static String queryInsertCategoryRelationship = "INSERT INTO wp_term_taxonomy(term_id, taxonomy, description, parent, count) VALUES (?, 'diploma', '', ?, 0)";
 
     private final static String querySelectRelationshipDiplomas = "SELECT category_id, item_id FROM jos_zoo_category_item";
 
@@ -34,10 +32,6 @@ public class QueryForDiplomas extends QueryBase {
 
     public static String getQuerySelectAllCategories() {
         return querySelectAllCategories;
-    }
-
-    public static String getQueryInsertCategories() {
-        return queryInsertCategories;
     }
 
     public static String getQuerySelectCategoryRelationship() {

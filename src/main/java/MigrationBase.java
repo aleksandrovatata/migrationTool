@@ -1,12 +1,17 @@
+import com.ibm.icu.text.Transliterator;
 import org.apache.commons.lang3.StringUtils;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MigrationBase {
     Connection sourceDbConnection;
@@ -23,7 +28,7 @@ public class MigrationBase {
     }
 
     protected int InsertPost(String title, String slug) throws Exception {
-        return InsertPostImplementation(title, "post", "publish", slug,"",0);
+        return InsertPostImplementation(title, "post", "publish", slug, "", 0);
     }
 
     protected int InsertAttachmentPost(String title, String guid, int parentId) throws Exception {
@@ -57,10 +62,41 @@ public class MigrationBase {
         throw new Exception("Cannot get generated key");
     }
 
-    protected String NormalizeSlug(String slug) {
-        var categorySlugTrimmed = slug.substring(0, Math.min(slug.length(), 33));
-        var categorySlugEncoded = URLEncoder.encode(categorySlugTrimmed, StandardCharsets.UTF_8);
+    protected void AddAttachmentToPost(int postId, StringBuilder postContentBuilder, String filePath, String title) throws Exception {
+        if (StringUtils.isEmpty(filePath)) {
+            return;
+        }
 
+        Path path = Paths.get(filePath);
+        var fileName = path.getFileName().toString();
+        var fileUrl = Configuration.GenerateDocumentUrl(fileName);
+
+        int attachmentPostId = InsertAttachmentPost(title, fileUrl, postId);
+
+        postContentBuilder.append(String.format("<!-- wp:file {\"id\":%s,\"href\":\"%s\"} -->", attachmentPostId, fileUrl));
+        postContentBuilder.append("<div class=\"wp-block-file\">");
+        postContentBuilder.append(String.format("<a href=\"%s\">%s</a>", fileUrl, title));
+        postContentBuilder.append(String.format("<a href=\"%s\" class=\"wp-block-file__button\" download>Завантажити</a>", fileUrl));
+        postContentBuilder.append("</div>");
+        postContentBuilder.append("<!-- /wp:file -->");
+    }
+
+    protected String UpdateImageLinks(String content) {
+        Pattern p = Pattern.compile("src\\s*=\\s*\"((?!.*http).+)\"");
+        Matcher m = p.matcher(content);
+        if (m.find()) {
+            return m.replaceAll(String.format("src=\"%s/$1\"", Configuration.getPathForImages()));
+        }
+
+        return content;
+    }
+
+    protected String NormalizeSlug(String slug) {
+        var CYRILLIC_TO_LATIN = "Ukrainian-Latin/BGN";
+        Transliterator toLatin = Transliterator.getInstance(CYRILLIC_TO_LATIN);
+        var result = toLatin.transliterate(slug);
+        var categorySlugTrimmed = result.substring(0, Math.min(result.length(), 170));
+        var categorySlugEncoded = URLEncoder.encode(categorySlugTrimmed, StandardCharsets.UTF_8);
         return StringUtils.stripEnd(categorySlugEncoded, "-");
     }
 

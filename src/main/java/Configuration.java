@@ -6,10 +6,16 @@ public class Configuration {
 
     final static int AuthorUserId = 1;
 
+    final static String pathForImages = "/wp-content/themes/start-theme";
+
     static String GenerateDocumentUrl(String fileName) {
         var now = LocalDate.now();
         String monthSegment = StringUtils.leftPad(String.valueOf(now.getMonthValue()), 2, '0');
 
         return String.format("%s/wp-content/uploads/%s/%s/%s", FilesBaseUrl, now.getYear(), monthSegment, fileName);
+    }
+
+    public static String getPathForImages() {
+        return pathForImages;
     }
 }

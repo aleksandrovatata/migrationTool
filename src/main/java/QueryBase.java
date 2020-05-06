@@ -20,6 +20,12 @@ public class QueryBase {
                     "        po.post_status IN ('publish', 'future')" +
                     ")";
 
+    private final static String queryInsertCategories = "INSERT INTO wp_terms(name, slug, term_group) VALUES (?, ? ,0)";
+
+    public static String getQueryInsertCategories() {
+        return queryInsertCategories;
+    }
+
     public static String getQueryInsertPost() {
         return queryInsertPost;
     }
