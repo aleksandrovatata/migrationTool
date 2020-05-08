@@ -9,8 +9,9 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import java.io.*;
 
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.*;
 
 public class Diplomas extends MigrationBase {
@@ -110,7 +111,7 @@ public class Diplomas extends MigrationBase {
 
             String diplomaPostTitle = String.format("%s - %s", studentName, diplomaTopic);
 
-            int wordpressDiplomaId = InsertPost(diplomaPostTitle, NormalizeSlug(slug));
+            int wordpressDiplomaId = InsertPost(diplomaPostTitle, NormalizeSlug(slug), Date.valueOf(LocalDate.now()));
             diplomaIdsMapping.put(diplomaId, wordpressDiplomaId);
 
             StringBuilder diplomaPostContentBuilder = new StringBuilder();
@@ -121,16 +122,16 @@ public class Diplomas extends MigrationBase {
             diplomaPostContentBuilder.append("<!-- /wp:paragraph -->");
 
             var presentationFilePath = ParseDocumentName(diplomaElements, "312d6aeb-7e50-4d4a-99fd-9d0380cddf87");
-            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, presentationFilePath, "presentation");
+            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, presentationFilePath, "Презентація  ", "diplomas/presentations/", Date.valueOf(LocalDate.now()));
 
             var diplomaUkFilePath = ParseDocumentName(diplomaElements, "243f9373-527c-4bbb-9ba2-6eccd140ab4e");
-            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, diplomaUkFilePath, "diploma-uk");
+            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, diplomaUkFilePath, "Анотація (укр)", "diplomas/annotations-uk/", Date.valueOf(LocalDate.now()));
 
             var diplomaRuFilePath = ParseDocumentName(diplomaElements, "27b10641-7d14-40a8-ac12-53b38e8af657");
-            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, diplomaRuFilePath, "diploma-ru");
+            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, diplomaRuFilePath, "Анотація (рос)", "diplomas/annotations-ru/", Date.valueOf(LocalDate.now()));
 
             var diplomaEnFilePath = ParseDocumentName(diplomaElements, "62a079d4-5a28-4197-a54d-4f024429c2f0");
-            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, diplomaEnFilePath, "diploma-en");
+            AddAttachmentToPost(wordpressDiplomaId, diplomaPostContentBuilder, diplomaEnFilePath, "Анотація (англ)", "diplomas/annotations-en/", Date.valueOf(LocalDate.now()));
 
             updatePostContentStatement.setNString(1, diplomaPostContentBuilder.toString());
             updatePostContentStatement.setInt(2, wordpressDiplomaId);
@@ -178,4 +179,5 @@ public class Diplomas extends MigrationBase {
         Node node = nodeList.item(0);
         return node.getTextContent();
     }
+
 }

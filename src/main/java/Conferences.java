@@ -78,8 +78,9 @@ public class Conferences extends MigrationBase{
             var newsTitle = selectContentNewsResultSet.getString("title");
             var newsContent = selectContentNewsResultSet.getString("introtext");
             var slug = selectContentNewsResultSet.getString("alias");
+            var dateTime = selectContentNewsResultSet.getDate("publish_up");
 
-            int wordpressPostId = InsertPost(newsTitle, NormalizeSlug(slug));
+            int wordpressPostId = InsertPost(newsTitle, NormalizeSlug(slug), dateTime);
 
             insertNewsRelationshipStatement.setInt(1, wordpressPostId);
             insertNewsRelationshipStatement.setInt(2, wordpressTermTaxonomyId);
@@ -104,7 +105,7 @@ public class Conferences extends MigrationBase{
                 var attachmentSize = selectAttachmentsResultSet.getInt("file_size");
                 var attachmentDate = selectAttachmentsResultSet.getDate("modification_date");
 
-                AddAttachmentToPost(wordpressPostId, newsPostContentBuilder, attachmentUrl, attachmentName);
+                AddAttachmentToPost(wordpressPostId, newsPostContentBuilder, attachmentUrl, attachmentName, "", dateTime);
             }
 
             updatePostContentStatement.setNString(1, newsPostContentBuilder.toString());

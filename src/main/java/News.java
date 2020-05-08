@@ -79,8 +79,9 @@ public class News extends MigrationBase {
             var newsTitle = selectContentNewsResultSet.getString("title");
             var newsContent = selectContentNewsResultSet.getString("introtext");
             var slug = selectContentNewsResultSet.getString("alias");
+            var dateTime = selectContentNewsResultSet.getDate("publish_up");
 
-            int wordpressPostId = InsertPost(newsTitle, NormalizeSlug(slug));
+            int wordpressPostId = InsertPost(newsTitle, NormalizeSlug(slug), dateTime);
 
             insertNewsRelationshipStatement.setInt(1, wordpressPostId);
             insertNewsRelationshipStatement.setInt(2, wordpressTermTaxonomyId);
@@ -105,7 +106,7 @@ public class News extends MigrationBase {
                 var attachmentSize = selectAttachmentsResultSet.getInt("file_size");
                 var attachmentDate = selectAttachmentsResultSet.getDate("modification_date");
 
-                AddAttachmentToPost(wordpressPostId, newsPostContentBuilder, attachmentUrl, attachmentName);
+                AddAttachmentToPost(wordpressPostId, newsPostContentBuilder, attachmentUrl, attachmentName, "", dateTime);
             }
 
             updatePostContentStatement.setNString(1, newsPostContentBuilder.toString());
@@ -114,33 +115,4 @@ public class News extends MigrationBase {
             updatePostContentStatement.executeUpdate();
         }
     }
-
-    /*private void AddAttachmentToPost(int postId, StringBuilder postContentBuilder, String filePath, String title) throws Exception {
-        if (StringUtils.isEmpty(filePath)) {
-            return;
-        }
-
-        Path path = Paths.get(filePath);
-        var fileName = path.getFileName().toString();
-        var fileUrl = Configuration.GenerateDocumentUrl(fileName);
-
-        int attachmentPostId = InsertAttachmentPost(title, fileUrl, postId);
-
-        postContentBuilder.append(String.format("<!-- wp:file {\"id\":%s,\"href\":\"%s\"} -->", attachmentPostId, fileUrl));
-        postContentBuilder.append("<div class=\"wp-block-file\">");
-        postContentBuilder.append(String.format("<a href=\"%s\">%s</a>", fileUrl, title));
-        postContentBuilder.append(String.format("<a href=\"%s\" class=\"wp-block-file__button\" download>Завантажити</a>", fileUrl));
-        postContentBuilder.append("</div>");
-        postContentBuilder.append("<!-- /wp:file -->");
-    }*/
-
-    /*private String UpdateImageLinks(String content) {
-        Pattern p = Pattern.compile("src\\s*=\\s*\"(.+?)\"");
-        Matcher m = p.matcher(content);
-        if (m.find()) {
-            return m.replaceAll("src=\"/wp-content/themes/start-theme/$1\"");
-        }
-
-        return content;
-    }*/
 }

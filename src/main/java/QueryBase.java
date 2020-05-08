@@ -6,7 +6,7 @@ public class QueryBase {
 
     private final static String queryUpdatePostContent = "UPDATE wp_posts SET post_content = ? WHERE id = ?";
 
-    private final static String queryClearCache = "DELETE FROM wp_options WHERE option_name = 'category_children'";
+    private final static String queryClearCache = "DELETE FROM wp_options WHERE option_name IN ('category_children', 'diploma_children')";
 
     private final static String queryRecalculateCategoryPostsCount =
             "UPDATE wp_term_taxonomy SET count = (" +

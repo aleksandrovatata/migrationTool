@@ -9,7 +9,6 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.LocalDate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,19 +26,18 @@ public class MigrationBase {
         }
     }
 
-    protected int InsertPost(String title, String slug) throws Exception {
-        return InsertPostImplementation(title, "post", "publish", slug, "", 0);
+    protected int InsertPost(String title, String slug, Date date) throws Exception {
+        return InsertPostImplementation(title, "post", "publish", slug, "", 0, date);
     }
 
-    protected int InsertAttachmentPost(String title, String guid, int parentId) throws Exception {
-        return InsertPostImplementation(title, "attachment", "inherit", "", guid, parentId);
+    protected int InsertAttachmentPost(String title, String guid, int parentId, Date date) throws Exception {
+        return InsertPostImplementation(title, "attachment", "inherit", "", guid, parentId, date);
     }
 
-    private int InsertPostImplementation(String title, String type, String status, String name, String guid, int parentId) throws Exception {
+    private int InsertPostImplementation(String title, String type, String status, String name, String guid, int parentId, Date date) throws Exception {
         var insertPostQueryText = QueryBase.getQueryInsertPost();
         var insertPostStatement = destinationDbConnection.prepareStatement(insertPostQueryText, Statement.RETURN_GENERATED_KEYS);
 
-        Date date = Date.valueOf(LocalDate.now());
         insertPostStatement.setDate(1, date);
         insertPostStatement.setDate(2, date);
         insertPostStatement.setNString(3, "");
@@ -62,16 +60,16 @@ public class MigrationBase {
         throw new Exception("Cannot get generated key");
     }
 
-    protected void AddAttachmentToPost(int postId, StringBuilder postContentBuilder, String filePath, String title) throws Exception {
+    protected void AddAttachmentToPost(int postId, StringBuilder postContentBuilder, String filePath, String title, String type, Date date) throws Exception {
         if (StringUtils.isEmpty(filePath)) {
             return;
         }
 
         Path path = Paths.get(filePath);
-        var fileName = path.getFileName().toString();
+        var fileName = type + path.getFileName().toString();
         var fileUrl = Configuration.GenerateDocumentUrl(fileName);
 
-        int attachmentPostId = InsertAttachmentPost(title, fileUrl, postId);
+        int attachmentPostId = InsertAttachmentPost(title, fileUrl, postId, date);
 
         postContentBuilder.append(String.format("<!-- wp:file {\"id\":%s,\"href\":\"%s\"} -->", attachmentPostId, fileUrl));
         postContentBuilder.append("<div class=\"wp-block-file\">");
@@ -85,7 +83,7 @@ public class MigrationBase {
         Pattern p = Pattern.compile("src\\s*=\\s*\"((?!.*http).+)\"");
         Matcher m = p.matcher(content);
         if (m.find()) {
-            return m.replaceAll(String.format("src=\"%s/$1\"", Configuration.getPathForImages()));
+            return m.replaceAll(String.format("src=\"%s/$1\"", Configuration.FilesBaseUrl));
         }
 
         return content;

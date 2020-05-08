@@ -4,7 +4,7 @@ public class QueryForNews extends QueryBase {
 
     private final static String queryInsertCategoryRelationship = "INSERT INTO wp_term_taxonomy(term_id, taxonomy, description, parent, count) VALUES (?, 'category', '', 0, 0)";
 
-    private final static String QuerySelectAllNews = "SELECT id, title, introtext, alias FROM jos_content WHERE catid = ?";
+    private final static String QuerySelectAllNews = "SELECT id, title, introtext, alias, publish_up FROM jos_content WHERE catid = ?";
 
     private final static String QuerySelectAllAttachmentsForNews = "SELECT id, filename, url, file_size, modification_date FROM jos_attachments WHERE article_id = ?";
 
